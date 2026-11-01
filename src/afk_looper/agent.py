@@ -28,6 +28,13 @@ ALLOWED = (
 )
 DENIED = ("Bash(git push *)", "Bash(gh pr *)")
 
+# The input field that says what a tool call is doing.
+TOOL_DETAIL = {
+    "Bash": "command", "Read": "file_path", "Edit": "file_path", "Write": "file_path",
+    "Glob": "pattern", "Grep": "pattern", "WebFetch": "url", "WebSearch": "query",
+}
+MAX_LINE = 120
+
 
 @dataclass(frozen=True)
 class AgentResult:
@@ -57,7 +64,7 @@ def run_agent(prompt: str, session: str | None, cwd: Path, log: Path, config: Co
             out.write(line)
             out.flush()
             event = _parse(line)
-            _show(event)
+            _show(event, cwd)
             if event.get("type") == "result":
                 final = event
     report = final.get("structured_output") or {}
@@ -79,11 +86,41 @@ def _parse(line: str) -> dict:
     return event if isinstance(event, dict) else {}
 
 
-def _show(event: dict) -> None:
-    if event.get("type") != "assistant":
+def _show(event: dict, cwd: Path) -> None:
+    kind = event.get("type")
+    if kind == "result":
+        seconds = event.get("duration_ms", 0) // 1000
+        cost = event.get("total_cost_usd", 0)
+        print(f"  Agent stopped: {event.get('subtype')}, {seconds // 60}m{seconds % 60:02d}s, ${cost:.2f}")
         return
-    for block in event.get("message", {}).get("content", []):
-        if block.get("type") == "text":
+    # Other events can carry a plain string as their message.
+    if kind not in ("assistant", "user"):
+        return
+    content = event.get("message", {}).get("content")
+    # A user event's content can be a plain string.
+    for block in content if isinstance(content, list) else []:
+        if kind == "assistant" and block.get("type") == "text":
             print(block["text"])
-        elif block.get("type") == "tool_use":
-            print(f"  -> {block['name']}")
+        elif kind == "assistant" and block.get("type") == "tool_use":
+            print(f"  -> {_describe_call(block, cwd)}")
+        elif kind == "user" and block.get("type") == "tool_result" and block.get("is_error"):
+            print(f"  !! {_one_line(_result_text(block.get('content')))}")
+
+
+def _describe_call(block: dict, cwd: Path) -> str:
+    name = block["name"]
+    detail = block.get("input", {}).get(TOOL_DETAIL.get(name))
+    if detail is None:
+        return name
+    return f"{name}: {_one_line(str(detail).removeprefix(f'{cwd}/'))}"
+
+
+def _result_text(content: object) -> str:
+    if isinstance(content, list):
+        return " ".join(part.get("text", "") for part in content)
+    return str(content)
+
+
+def _one_line(text: str) -> str:
+    line = " ".join(text.split())
+    return line if len(line) <= MAX_LINE else f"{line[:MAX_LINE - 3]}..."

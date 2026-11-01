@@ -41,6 +41,61 @@ def test_blocked_issue_waits(world: World):
     assert world.agent_runs() == []
 
 
+def test_the_terminal_shows_what_the_agent_does(world: World):
+    worktree = world.checkout.parent / "widget-afk"
+    calls = [
+        {"type": "tool_use", "name": "Bash", "input": {"command": "uv run\n  pytest"}},
+        {"type": "tool_use", "name": "Bash", "input": {"command": "x" * 200}},
+        {"type": "tool_use", "name": "Read", "input": {"file_path": f"{worktree}/src/a.py"}},
+        {"type": "tool_use", "name": "TodoWrite", "input": {"todos": []}},
+    ]
+    results = [
+        {"type": "tool_result", "is_error": True, "content": "Exit code 1\nboom"},
+        {"type": "tool_result", "is_error": True, "content": [{"type": "text", "text": "denied"}]},
+        {"type": "tool_result", "content": "quiet success"},
+    ]
+    events = [
+        {"type": "system", "subtype": "permission_denied", "message": "a plain string"},
+        {"type": "assistant", "message": {"content": calls}},
+        {"type": "user", "message": {"content": results}},
+        {"type": "user", "message": {"content": "a plain string"}},
+    ]
+    world.issues(i1={"title": "Thing"})
+    world.scenario({"sh": COMMIT, "report": DONE, "events": events}, {"report": REVIEWED})
+    done = world.afk("run")
+    assert done.returncode == 0, done.stderr
+    lines = done.stdout.splitlines()
+    assert "  -> Bash: uv run pytest" in lines
+    assert f"  -> Bash: {'x' * 117}..." in lines
+    assert "  -> Read: src/a.py" in lines
+    assert "  -> TodoWrite" in lines
+    assert "  !! Exit code 1 boom" in lines
+    assert "  !! denied" in lines
+    assert "quiet success" not in done.stdout
+    assert "  Agent stopped: success, 1m01s, $0.50" in lines
+
+
+def test_the_terminal_shows_each_phase_in_order(world: World):
+    world.issues(i1={"title": "Thing"})
+    world.scenario({"sh": COMMIT, "report": DONE}, {"report": REVIEWED})
+    out = world.afk("run").stdout
+    phases = [
+        "=== Issue #1: Thing ===",
+        "--- Preparing the worktree",
+        "--- Implementing (log: issue-1-run-1.jsonl)",
+        "--- Gate: test ! -e broken",
+        "Gate passed",
+        "--- Reviewing (log: issue-1-run-2.jsonl)",
+        "--- Gate: test ! -e broken",
+        "Gate passed",
+        "--- Publishing feat/thing",
+        "Merged https://fake/pr/1",
+    ]
+    position = 0
+    for phase in phases:
+        position = out.index(phase, position) + len(phase)
+
+
 def test_a_question_goes_to_the_human_and_the_answer_resumes_the_session(world: World):
     world.issues(i1={"title": "Thing"})
     world.scenario(
@@ -100,6 +155,7 @@ def test_a_failing_check_returns_to_the_agent_and_blocks_the_merge(world: World)
     )
     done = world.afk("run")
     assert "Merged: #1" in done.stdout
+    assert "Gate refused (retry 1/2):\n`test ! -e broken` failed" in done.stdout
     retry = prompt_of(world.agent_runs()[1])
     assert "The gate refused the branch" in retry
     assert "`test ! -e broken` failed" in retry

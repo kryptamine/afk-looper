@@ -3,7 +3,7 @@ import subprocess
 from afk_looper.agent import run_agent
 from afk_looper.config import Config
 from afk_looper.gate import refusal
-from afk_looper.issues import list_issues
+from afk_looper.issues import Issue, list_issues
 from afk_looper.notify import keep_awake, notify
 from afk_looper.proc import describe, run
 from afk_looper.prompts import implement_prompt, review_prompt
@@ -36,25 +36,26 @@ class Looper:
         keep_awake()
         try:
             while (issue := self._next_issue()) is not None:
-                print(f"=== Issue #{issue} ===")
+                print(f"=== Issue #{issue.number}: {issue.title} ===")
                 try:
-                    self._work_on(issue)
-                    self.merged.append(issue)
+                    self._work_on(issue.number)
+                    self.merged.append(issue.number)
                 except Skip:
-                    self.skipped.append(issue)
+                    self.skipped.append(issue.number)
         except Stop:
             pass
         finally:
             self._summary()
 
-    def _next_issue(self) -> int | None:
+    def _next_issue(self) -> Issue | None:
         for issue in list_issues(self.repo, self.config.label):
             if issue.open_blockers == 0 and issue.number not in self.skipped:
-                return issue.number
+                return issue
         return None
 
     def _work_on(self, issue: int) -> None:
         base, check = self.repo.base, self.config.check
+        print("--- Preparing the worktree")
         self._retrying(issue, "Preparing the worktree", lambda: self._prepare_worktree(issue))
         prompt = implement_prompt(issue, base, check)
         session = None
@@ -63,6 +64,7 @@ class Looper:
         retries = 0
         while True:
             log = self.repo.logs / f"issue-{issue}-run-{self._next_run()}.jsonl"
+            print(f"--- {'Reviewing' if reviewed else 'Implementing'} (log: {log.name})")
             result = run_agent(prompt, session, self.repo.worktree, log, self.config)
             session = result.session_id or session
             if result.status == "needs_human":
@@ -78,11 +80,7 @@ class Looper:
 
             if not reviewed:
                 title, body = result.pr_title, result.pr_body
-            failure = (
-                refusal(self.repo.worktree, base, check)
-                if title
-                else "Report pr_title and pr_body with status done."
-            )
+            failure = self._gate() if title else "Report pr_title and pr_body with status done."
             if failure is None:
                 if reviewed:
                     break
@@ -98,10 +96,19 @@ class Looper:
                 retries = 0
                 prompt = f"The gate failed:\n{failure}\nThe human says: {answer}"
             else:
+                print(f"Gate refused (retry {retries}/{MAX_GATE_RETRIES}):\n{failure}")
                 prompt = f"The gate refused the branch. Fix it, commit, and report again.\n{failure}"
 
         branch = run("git", "branch", "--show-current", cwd=self.repo.worktree)
+        print(f"--- Publishing {branch}")
         self._retrying(issue, f"Publishing {branch}", lambda: publish(self.repo, issue, branch, title, body))
+
+    def _gate(self) -> str | None:
+        print(f"--- Gate: {self.config.check}")
+        failure = refusal(self.repo.worktree, self.repo.base, self.config.check)
+        if failure is None:
+            print("Gate passed")
+        return failure
 
     def _next_run(self) -> int:
         self.runs += 1
@@ -116,6 +123,7 @@ class Looper:
         # A stash, because an interrupted run may have left work worth keeping.
         if run("git", "status", "--porcelain", cwd=repo.worktree):
             run("git", "stash", "push", "-q", "-u", "-m", f"afk leftovers before #{issue}", cwd=repo.worktree)
+            print(f"Stashed leftovers in {repo.worktree}")
         run("git", "switch", "-q", "--detach", upstream, cwd=repo.worktree)
         subprocess.run(self.config.install, shell=True, cwd=repo.worktree, check=True)
 
