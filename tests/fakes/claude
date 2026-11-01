@@ -16,9 +16,13 @@ if run >= len(steps):
 step = steps[run]
 subprocess.run(step.get("sh", "true"), shell=True, check=True, stdout=subprocess.DEVNULL)
 print(json.dumps({"type": "assistant", "message": {"content": [{"type": "text", "text": f"step {run}"}]}}))
+for event in step.get("events", []):
+    print(json.dumps(event))
 print(json.dumps({
     "type": "result",
     "subtype": "success",
+    "duration_ms": 61000,
+    "total_cost_usd": 0.5,
     "session_id": f"session-{run}",
     "structured_output": step["report"],
 }))

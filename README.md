@@ -34,6 +34,9 @@ At a prompt, reply with an answer, `skip` for the next issue, or `stop` to quit.
 Work happens in a worktree beside the checkout (`../<repo>-afk`), and logs go to
 `.afk-logs/` in the checkout. An issue with open blockers waits for them.
 
+The terminal shows each phase, the agent's tool calls and failed results, the gate's
+refusals, and each agent run's time and cost. The logs hold the full agent stream.
+
 ## Configure
 
 An optional `.afk.toml` at the repository root. These are the defaults:
