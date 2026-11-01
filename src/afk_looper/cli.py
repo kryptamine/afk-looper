@@ -19,12 +19,15 @@ def main() -> int:
     parser = argparse.ArgumentParser(prog="afk", description="Work through ready-for-agent issues, merging each.")
     parser.add_argument("--version", action="version", version=f"afk {version(PACKAGE)}")
     commands = parser.add_subparsers(dest="command", required=True)
-    commands.add_parser("run", help="work through the issues and merge them")
+    run = commands.add_parser("run", help="work through the issues and merge them")
+    run.add_argument("--danger", action="store_true", help="skip the agent's permission checks entirely")
     commands.add_parser("list", help="show the labelled issues and which are blocked")
     commands.add_parser("update", help="upgrade afk to the latest commit on main")
-    command = parser.parse_args().command
+    args = parser.parse_args()
     try:
-        return {"run": _run, "list": _list, "update": _update}[command]()
+        if args.command == "run":
+            return _run(args.danger)
+        return {"list": _list, "update": _update}[args.command]()
     except subprocess.CalledProcessError as error:
         print(f"afk: {describe(error)}", file=sys.stderr)
         return 1
@@ -32,9 +35,12 @@ def main() -> int:
         return 130
 
 
-def _run() -> int:
+def _run(danger: bool) -> int:
     repo = find_repo(Path.cwd())
-    Looper(repo, load_config(repo.root)).run()
+    config = load_config(repo.root)
+    if danger:
+        print("DANGER: the agent runs with no permission checks and can do anything your user can.")
+    Looper(repo, config, danger).run()
     return 0
 
 

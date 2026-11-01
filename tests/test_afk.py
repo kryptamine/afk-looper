@@ -217,6 +217,41 @@ def test_config_reaches_the_agent_and_the_issue_query(world: World):
     assert "Bash(git push *)" in implement[implement.index("--disallowedTools"):]
 
 
+def test_a_normal_run_keeps_the_permission_checks(world: World):
+    world.issues(i1={"title": "Thing"})
+    world.scenario({"sh": COMMIT, "report": DONE}, {"report": REVIEWED})
+    done = world.afk("run")
+    assert "DANGER" not in done.stdout
+    for run in world.agent_runs():
+        assert "--dangerously-skip-permissions" not in run
+        assert run[run.index("--permission-mode") + 1] == "acceptEdits"
+
+
+def test_danger_skips_permissions_on_every_agent_but_keeps_the_gate_commands_denied(world: World):
+    world.issues(i1={"title": "Thing"})
+    world.scenario({"sh": COMMIT, "report": DONE}, {"report": REVIEWED})
+    done = world.afk("run", "--danger")
+    assert done.returncode == 0, done.stderr
+    assert "DANGER" in done.stdout
+    assert "Merged: #1" in done.stdout
+    runs = world.agent_runs()
+    assert len(runs) == 2
+    for run in runs:
+        assert "--dangerously-skip-permissions" in run
+        assert "--permission-mode" not in run
+        assert "--allowedTools" not in run
+        assert "Bash(git push *)" in run[run.index("--disallowedTools"):]
+
+
+def test_danger_cannot_be_turned_on_from_the_repository_config(world: World):
+    (world.checkout / ".afk.toml").write_text("danger = true\n")
+    world.issues(i1={"title": "Thing"})
+    done = world.afk("run")
+    assert done.returncode != 0
+    assert "unknown keys: danger" in done.stderr
+    assert world.agent_runs() == []
+
+
 def test_budget_env_overrides_the_config(world: World):
     world.issues(i1={"title": "Thing"})
     world.scenario({"sh": COMMIT, "report": DONE}, {"report": REVIEWED})

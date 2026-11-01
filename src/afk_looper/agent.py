@@ -46,12 +46,16 @@ class AgentResult:
     pr_body: str
 
 
-def run_agent(prompt: str, session: str | None, cwd: Path, log: Path, config: Config) -> AgentResult:
+def run_agent(prompt: str, session: str | None, cwd: Path, log: Path, config: Config, danger: bool) -> AgentResult:
+    permissions = (
+        ["--dangerously-skip-permissions"] if danger
+        else ["--permission-mode", "acceptEdits", "--allowedTools", *ALLOWED, *config.allow]
+    )
     args = [
         "claude", "-p", prompt,
         "--output-format", "stream-json", "--verbose", "--json-schema", SCHEMA,
-        "--permission-mode", "acceptEdits", "--max-budget-usd", str(config.budget_usd),
-        "--allowedTools", *ALLOWED, *config.allow,
+        "--max-budget-usd", str(config.budget_usd),
+        *permissions,
         "--disallowedTools", *DENIED,
     ]
     if session:

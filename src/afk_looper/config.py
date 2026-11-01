@@ -6,6 +6,7 @@ from pathlib import Path
 CONFIG_FILE = ".afk.toml"
 
 
+# Danger mode is deliberately not here: this file lives in the repository the agent edits.
 @dataclass(frozen=True)
 class Config:
     label: str = "ready-for-agent"

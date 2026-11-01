@@ -25,6 +25,7 @@ Run from anywhere inside the target repository:
 ```sh
 afk list      # show the labelled issues and which are blocked
 afk run       # work through them, merging each
+afk run --danger  # the same, with no permission checks on the agent
 afk update    # upgrade afk itself to the latest commit on main
 afk --version
 ```
@@ -48,6 +49,14 @@ check = "make check"          # must pass before a merge
 budget_usd = 30               # cap on one agent run; AFK_BUDGET_USD overrides it
 allow = []                    # extra Claude tools, e.g. ["Bash(cargo *)"]
 ```
+
+## Danger mode
+
+`afk run --danger` passes `--dangerously-skip-permissions` to every agent run, so the
+agent can do anything your user can on this machine, including what an issue's text
+talks it into. `allow` is ignored. `git push` and `gh pr` stay denied, so the base
+branch still moves only through the gate. It is a flag and not a config key, because
+`.afk.toml` lives in the repository the agent edits.
 
 ## The gate
 

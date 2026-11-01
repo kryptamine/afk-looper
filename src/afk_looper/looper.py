@@ -22,9 +22,10 @@ class Stop(Exception):
 
 
 class Looper:
-    def __init__(self, repo: Repo, config: Config) -> None:
+    def __init__(self, repo: Repo, config: Config, danger: bool = False) -> None:
         self.repo = repo
         self.config = config
+        self.danger = danger
         self.merged: list[int] = []
         self.skipped: list[int] = []
         self.runs = 0
@@ -65,7 +66,7 @@ class Looper:
         while True:
             log = self.repo.logs / f"issue-{issue}-run-{self._next_run()}.jsonl"
             print(f"--- {'Reviewing' if reviewed else 'Implementing'} (log: {log.name})")
-            result = run_agent(prompt, session, self.repo.worktree, log, self.config)
+            result = run_agent(prompt, session, self.repo.worktree, log, self.config, self.danger)
             session = result.session_id or session
             if result.status == "needs_human":
                 prompt = f"The human answered: {self._ask(issue, result.question)}"
