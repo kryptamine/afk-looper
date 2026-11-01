@@ -21,12 +21,21 @@ SCHEMA = json.dumps({
 # Not a security boundary: make and friends can run anything on this machine.
 ALLOWED = (
     "Read", "Edit", "Write", "Glob", "Grep", "WebFetch", "WebSearch", "TodoWrite",
-    "Bash(git *)", "Bash(gh issue view *)", "Bash(gh issue comment *)", "Bash(make *)",
+    "Bash(git *)", "Bash(gh issue view *)", "Bash(gh issue list *)", "Bash(gh issue comment *)",
+    "Bash(gh pr view *)", "Bash(gh pr list *)", "Bash(gh pr diff *)", "Bash(gh pr checks *)",
+    "Bash(gh repo view *)", "Bash(gh auth status *)", "Bash(make *)",
     "Bash(ls *)", "Bash(cat *)", "Bash(head *)", "Bash(tail *)", "Bash(wc *)", "Bash(rg *)",
     "Bash(grep *)", "Bash(find *)", "Bash(sed *)", "Bash(awk *)", "Bash(perl *)", "Bash(jq *)",
     "Bash(mkdir *)", "Bash(mv *)", "Bash(cp *)", "Bash(rm *)", "Bash(chmod *)",
 )
-DENIED = ("Bash(git push *)", "Bash(gh pr *)")
+# A deny outranks an allow, so `gh pr` is denied by verb to leave the read-only ones open.
+# `gh pr -*` covers a flag before the verb, as in `gh pr -R owner/repo merge`.
+DENIED = (
+    "Bash(git push *)", "Bash(gh pr -*)", "Bash(gh pr create *)", "Bash(gh pr merge *)",
+    "Bash(gh pr close *)", "Bash(gh pr reopen *)", "Bash(gh pr edit *)", "Bash(gh pr ready *)",
+    "Bash(gh pr review *)", "Bash(gh pr comment *)", "Bash(gh pr update-branch *)",
+    "Bash(gh pr revert *)", "Bash(gh pr lock *)", "Bash(gh pr unlock *)",
+)
 
 # The input field that says what a tool call is doing.
 TOOL_DETAIL = {

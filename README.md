@@ -54,8 +54,8 @@ allow = []                    # extra Claude tools, e.g. ["Bash(cargo *)"]
 
 `afk run --danger` passes `--dangerously-skip-permissions` to every agent run, so the
 agent can do anything your user can on this machine, including what an issue's text
-talks it into. `allow` is ignored. `git push` and `gh pr` stay denied, so the base
-branch still moves only through the gate. It is a flag and not a config key, because
+talks it into. `allow` is ignored. `git push` and the `gh pr` commands that change a
+pull request stay denied, so the base branch still moves only through the gate. It is a flag and not a config key, because
 `.afk.toml` lives in the repository the agent edits.
 
 ## The gate

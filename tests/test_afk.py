@@ -217,6 +217,18 @@ def test_config_reaches_the_agent_and_the_issue_query(world: World):
     assert "Bash(git push *)" in implement[implement.index("--disallowedTools"):]
 
 
+def test_the_agent_reads_pull_requests_but_cannot_change_them(world: World):
+    world.issues(i1={"title": "Thing"})
+    world.scenario({"sh": COMMIT, "report": DONE}, {"report": REVIEWED})
+    world.afk("run")
+    implement = world.agent_runs()[0]
+    denied = implement.index("--disallowedTools")
+    assert "Bash(gh pr view *)" in implement[:denied]
+    assert "Bash(gh pr view *)" not in implement[denied:]
+    assert "Bash(gh pr merge *)" in implement[denied:]
+    assert "Bash(gh pr -*)" in implement[denied:]
+
+
 def test_a_normal_run_keeps_the_permission_checks(world: World):
     world.issues(i1={"title": "Thing"})
     world.scenario({"sh": COMMIT, "report": DONE}, {"report": REVIEWED})
