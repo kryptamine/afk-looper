@@ -1,0 +1,54 @@
+#!/usr/bin/env python3
+"""Fake GitHub: issues and pull requests in a JSON file, merges into the local origin."""
+import json
+import os
+import re
+import subprocess
+import sys
+from pathlib import Path
+
+state_file = Path(os.environ["FAKE_GH_STATE"])
+state = json.loads(state_file.read_text())
+args = sys.argv[1:]
+
+
+def flag(name):
+    return args[args.index(name) + 1]
+
+
+def save():
+    state_file.write_text(json.dumps(state))
+
+
+match args[:2]:
+    case ["repo", "view"]:
+        print(json.dumps({"nameWithOwner": "acme/widget", "defaultBranchRef": {"name": "main"}}))
+    case ["issue", "list"]:
+        state["labels"] = state.get("labels", []) + [flag("--label")]
+        save()
+        print(json.dumps([{"number": int(n)} for n, i in state["issues"].items() if i["state"] == "OPEN"]))
+    case ["api", path]:
+        issue = state["issues"][path.rsplit("/", 1)[1]]
+        print(json.dumps({"title": issue["title"], "issue_dependencies_summary": {"blocked_by": issue["blocked"]}}))
+    case ["issue", "view"]:
+        print(json.dumps({"state": state["issues"][args[2]]["state"]}))
+    case ["issue", "close"]:
+        state["issues"][args[2]]["state"] = "CLOSED"
+        save()
+    case ["pr", "view"]:
+        sys.exit(1)
+    case ["pr", "create"]:
+        url = f"https://fake/pr/{len(state['prs']) + 1}"
+        state["prs"][url] = {"branch": flag("--head"), "title": flag("--title"), "body": flag("--body")}
+        save()
+        print(url)
+    case ["pr", "merge"]:
+        pr = state["prs"][args[2]]
+        origin = os.environ["FAKE_ORIGIN"]
+        subprocess.run(["git", "-C", origin, "update-ref", "refs/heads/main", f"refs/heads/{pr['branch']}"], check=True)
+        pr["merged"] = True
+        if closes := re.search(r"Closes #(\d+)", pr["body"]):
+            state["issues"][closes[1]]["state"] = "CLOSED"
+        save()
+    case _:
+        sys.exit(f"fake gh: unhandled {args}")
