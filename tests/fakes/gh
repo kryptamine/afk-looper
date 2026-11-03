@@ -26,7 +26,12 @@ match args[:2]:
     case ["issue", "list"]:
         state["labels"] = state.get("labels", []) + [flag("--label")]
         save()
-        print(json.dumps([{"number": int(n)} for n, i in state["issues"].items() if i["state"] == "OPEN"]))
+        print(json.dumps([{"number": int(n)} for n, i in state["issues"].items()
+                          if i["state"] == "OPEN" or i.get("stale")]))
+    case ["api", path] if path.endswith("/dependencies/blocked_by"):
+        issues = state["issues"]
+        blockers = issues[path.split("/")[-3]].get("blocked_by", [])
+        print(json.dumps([{"number": n, "state": issues[str(n)]["state"].lower()} for n in blockers]))
     case ["api", path]:
         issue = state["issues"][path.rsplit("/", 1)[1]]
         print(json.dumps({"title": issue["title"], "issue_dependencies_summary": {"blocked_by": issue["blocked"]}}))
