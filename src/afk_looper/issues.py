@@ -25,3 +25,9 @@ def _fetch(repo: Repo, number: int) -> Issue:
     issue = json.loads(run("gh", "api", f"repos/{repo.name}/issues/{number}", cwd=repo.root))
     summary = issue.get("issue_dependencies_summary") or {}
     return Issue(number, summary.get("blocked_by", 0), issue["title"])
+
+
+def open_blockers(repo: Repo, number: int) -> set[int]:
+    path = f"repos/{repo.name}/issues/{number}/dependencies/blocked_by"
+    blockers = json.loads(run("gh", "api", path, cwd=repo.root))
+    return {b["number"] for b in blockers if b["state"] == "open"}

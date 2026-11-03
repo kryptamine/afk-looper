@@ -124,6 +124,40 @@ def test_skip_moves_on_without_merging(world: World):
     assert world.github()["issues"]["1"]["state"] == "OPEN"
 
 
+def test_a_merged_issue_github_still_lists_is_not_picked_again(world: World):
+    world.issues(i1={"title": "Thing", "stale": True})
+    world.scenario({"sh": COMMIT, "report": DONE}, {"report": REVIEWED})
+    done = world.afk("run")
+    assert done.returncode == 0, done.stderr
+    assert done.stdout.count("=== Issue #1") == 1
+    assert len(world.agent_runs()) == 2
+
+
+def test_an_issue_blocked_only_by_a_merged_one_goes_next(world: World):
+    # The fake never lowers "blocked", like GitHub's summary right after a merge.
+    world.issues(i1={"title": "First"}, i2={"title": "Second", "blocked": 1, "blocked_by": [1]})
+    second = "git switch -q -c feat/second && touch second && git add . && git commit -qm 'feat: second'"
+    world.scenario(
+        {"sh": COMMIT, "report": DONE}, {"report": REVIEWED},
+        {"sh": second, "report": DONE}, {"report": REVIEWED},
+    )
+    done = world.afk("run")
+    assert done.returncode == 0, done.stderr
+    assert "Merged: #1 #2" in done.stdout
+
+
+def test_an_issue_with_another_open_blocker_still_waits(world: World):
+    world.issues(
+        i1={"title": "First"},
+        i2={"title": "Second", "blocked": 2, "blocked_by": [1, 3]},
+        i3={"title": "Third", "blocked": 1, "blocked_by": [2]},
+    )
+    world.scenario({"sh": COMMIT, "report": DONE}, {"report": REVIEWED})
+    done = world.afk("run")
+    assert done.returncode == 0, done.stderr
+    assert "Merged: #1\n" in done.stdout
+
+
 def test_stop_ends_the_run_with_a_summary(world: World):
     world.issues(i1={"title": "Hard"})
     world.scenario({"report": {"status": "needs_human", "question": "Which?"}})

@@ -3,7 +3,7 @@ import subprocess
 from afk_looper.agent import run_agent
 from afk_looper.config import Config
 from afk_looper.gate import refusal
-from afk_looper.issues import Issue, list_issues
+from afk_looper.issues import Issue, list_issues, open_blockers
 from afk_looper.notify import keep_awake, notify
 from afk_looper.proc import describe, run
 from afk_looper.prompts import implement_prompt, review_prompt
@@ -49,10 +49,18 @@ class Looper:
             self._summary()
 
     def _next_issue(self) -> Issue | None:
+        done = self.merged + self.skipped
+        # GitHub lists a just-closed issue as open for a while after the merge.
         for issue in list_issues(self.repo, self.config.label):
-            if issue.open_blockers == 0 and issue.number not in self.skipped:
+            if issue.number not in done and self._unblocked(issue):
                 return issue
         return None
+
+    def _unblocked(self, issue: Issue) -> bool:
+        if issue.open_blockers == 0:
+            return True
+        # The summary lags behind a merge too; the blocker list is fresh enough.
+        return bool(self.merged) and open_blockers(self.repo, issue.number) <= set(self.merged)
 
     def _work_on(self, issue: int) -> None:
         base, check = self.repo.base, self.config.check
