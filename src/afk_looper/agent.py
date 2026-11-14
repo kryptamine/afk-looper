@@ -35,6 +35,8 @@ DENIED = (
     "Bash(gh pr close *)", "Bash(gh pr reopen *)", "Bash(gh pr edit *)", "Bash(gh pr ready *)",
     "Bash(gh pr review *)", "Bash(gh pr comment *)", "Bash(gh pr update-branch *)",
     "Bash(gh pr revert *)", "Bash(gh pr lock *)", "Bash(gh pr unlock *)",
+    # `claude -p` stays alive until a scheduled wakeup fires, long after the agent reported.
+    "ScheduleWakeup", "CronCreate",
 )
 
 # The input field that says what a tool call is doing.
