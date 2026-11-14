@@ -8,7 +8,7 @@ from afk_looper.repo import Repo
 def publish(repo: Repo, issue: int, branch: str, title: str, body: str) -> None:
     run("git", "push", "-u", "origin", branch, cwd=repo.worktree)
     url = _open_pull_request(repo, issue, branch, title, body)
-    run("gh", "pr", "merge", url, "--merge", cwd=repo.root)
+    run("gh", "pr", "merge", url, repo.merge_flag, cwd=repo.root)
     print(f"Merged {url}")
     _clean_up(repo, branch)
     state = json.loads(run("gh", "issue", "view", str(issue), "--json", "state", cwd=repo.root))

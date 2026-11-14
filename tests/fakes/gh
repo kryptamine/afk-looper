@@ -22,7 +22,12 @@ def save():
 
 match args[:2]:
     case ["repo", "view"]:
-        print(json.dumps({"nameWithOwner": "acme/widget", "defaultBranchRef": {"name": "main"}}))
+        allowed = state.get("merge_methods", ["merge", "squash", "rebase"])
+        print(json.dumps({
+            "nameWithOwner": "acme/widget", "defaultBranchRef": {"name": "main"},
+            "mergeCommitAllowed": "merge" in allowed, "squashMergeAllowed": "squash" in allowed,
+            "rebaseMergeAllowed": "rebase" in allowed,
+        }))
     case ["issue", "list"]:
         state["labels"] = state.get("labels", []) + [flag("--label")]
         save()
@@ -51,7 +56,7 @@ match args[:2]:
         pr = state["prs"][args[2]]
         origin = os.environ["FAKE_ORIGIN"]
         subprocess.run(["git", "-C", origin, "update-ref", "refs/heads/main", f"refs/heads/{pr['branch']}"], check=True)
-        pr["merged"] = True
+        pr["merged"] = args[3]
         if closes := re.search(r"Closes #(\d+)", pr["body"]):
             state["issues"][closes[1]]["state"] = "CLOSED"
         save()

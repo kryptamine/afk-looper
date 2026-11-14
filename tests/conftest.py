@@ -22,10 +22,10 @@ class World:
     tmp: Path
     env: dict[str, str]
 
-    def issues(self, **issues: dict) -> None:
+    def issues(self, merge_methods: tuple[str, ...] = ("merge", "squash", "rebase"), **issues: dict) -> None:
         """issues(i1={"title": ..., "blocked": 0}), keyed i<number>."""
         state = {k[1:]: {"blocked": 0, "state": "OPEN", **v} for k, v in issues.items()}
-        self._gh_state().write_text(json.dumps({"issues": state, "prs": {}}))
+        self._gh_state().write_text(json.dumps({"issues": state, "prs": {}, "merge_methods": merge_methods}))
 
     def scenario(self, *steps: dict) -> None:
         (self.tmp / "scenario.json").write_text(json.dumps(list(steps)))

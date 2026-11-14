@@ -28,10 +28,19 @@ def test_a_clean_issue_is_reviewed_by_a_fresh_agent_then_merged(world: World):
     pr = world.github()["prs"]["https://fake/pr/1"]
     assert pr["title"] == "feat: add thing"
     assert pr["body"] == "Because.\n\nCloses #1"
+    assert pr["merged"] == "--merge"
     implement, review = world.agent_runs()
     assert "--resume" not in review
     assert "You review the branch" in prompt_of(review)
     assert "issue #1" in prompt_of(implement)
+
+
+def test_a_repository_that_forbids_merge_commits_gets_a_squash(world: World):
+    world.issues(merge_methods=("squash", "rebase"), i1={"title": "Thing"})
+    world.scenario({"sh": COMMIT, "report": DONE}, {"report": REVIEWED})
+    done = world.afk("run")
+    assert done.returncode == 0, done.stderr
+    assert world.github()["prs"]["https://fake/pr/1"]["merged"] == "--squash"
 
 
 def test_blocked_issue_waits(world: World):
