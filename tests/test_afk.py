@@ -263,6 +263,16 @@ def test_the_agent_reads_pull_requests_but_cannot_change_them(world: World):
     assert "Bash(gh pr -*)" in implement[denied:]
 
 
+def test_the_agent_cannot_schedule_a_wakeup_that_outlives_its_report(world: World):
+    world.issues(i1={"title": "Thing"})
+    world.scenario({"sh": COMMIT, "report": DONE}, {"report": REVIEWED})
+    world.afk("run", "--danger")
+    for run in world.agent_runs():
+        denied = run[run.index("--disallowedTools"):]
+        assert "ScheduleWakeup" in denied
+        assert "CronCreate" in denied
+
+
 def test_a_normal_run_keeps_the_permission_checks(world: World):
     world.issues(i1={"title": "Thing"})
     world.scenario({"sh": COMMIT, "report": DONE}, {"report": REVIEWED})
