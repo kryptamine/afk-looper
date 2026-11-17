@@ -5,7 +5,9 @@ from afk_looper.proc import run
 from afk_looper.repo import Repo
 
 
-def publish(repo: Repo, issue: int, branch: str, title: str, body: str) -> None:
+def publish(repo: Repo, issue: int, branch: str, title: str, body: str, direct: bool = False) -> None:
+    if direct:
+        return _push_to_base(repo, issue, branch)
     run("git", "push", "-u", "origin", branch, cwd=repo.worktree)
     url = _open_pull_request(repo, issue, branch, title, body)
     run("gh", "pr", "merge", url, repo.merge_flag, cwd=repo.root)
@@ -14,6 +16,16 @@ def publish(repo: Repo, issue: int, branch: str, title: str, body: str) -> None:
     state = json.loads(run("gh", "issue", "view", str(issue), "--json", "state", cwd=repo.root))
     if state["state"] != "CLOSED":
         _best_effort(repo, "gh", "issue", "close", str(issue), "--comment", f"Merged in {url}")
+
+
+def _push_to_base(repo: Repo, issue: int, branch: str) -> None:
+    # The gate has just seen the branch on top of the base, so this is a fast-forward.
+    run("git", "push", "origin", f"HEAD:refs/heads/{repo.base}", cwd=repo.worktree)
+    sha = run("git", "rev-parse", "--short", "HEAD", cwd=repo.worktree)
+    print(f"Pushed {sha} to {repo.base}")
+    _best_effort(repo, "git", "switch", "-q", "--detach")
+    _best_effort(repo, "git", "branch", "-qD", branch)
+    _best_effort(repo, "gh", "issue", "close", str(issue), "--comment", f"Pushed to {repo.base} in {sha}")
 
 
 def _open_pull_request(repo: Repo, issue: int, branch: str, title: str, body: str) -> str:

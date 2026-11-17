@@ -26,6 +26,7 @@ Run from anywhere inside the target repository:
 afk list      # show the labelled issues and which are blocked
 afk run       # work through them, merging each
 afk run --danger  # the same, with no permission checks on the agent
+afk run --direct  # push each issue straight to the default branch, no pull request
 afk update    # upgrade afk itself to the latest commit on main
 afk --version
 ```
@@ -57,6 +58,13 @@ agent can do anything your user can on this machine, including what an issue's t
 talks it into. `allow` is ignored. `git push` and the `gh pr` commands that change a
 pull request stay denied, so the base branch still moves only through the gate. It is a flag and not a config key, because
 `.afk.toml` lives in the repository the agent edits.
+
+## Direct mode
+
+`afk run --direct` skips the pull request: once the gate passes after the review, `afk`
+pushes the branch's commits straight onto the default branch and closes the issue with
+the commit. The gate, `check` included, still runs first. Branch protection on the
+default branch rejects the push.
 
 ## The gate
 
