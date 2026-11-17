@@ -43,6 +43,29 @@ def test_a_repository_that_forbids_merge_commits_gets_a_squash(world: World):
     assert world.github()["prs"]["https://fake/pr/1"]["merged"] == "--squash"
 
 
+def test_direct_pushes_to_the_default_branch_with_no_pull_request(world: World):
+    world.issues(i1={"title": "Thing"})
+    world.scenario({"sh": COMMIT, "report": DONE}, {"report": REVIEWED})
+    done = world.afk("run", "--direct")
+    assert done.returncode == 0, done.stderr
+    assert "Merged: #1" in done.stdout
+    assert world.origin_log()[0] == "feat: add thing"
+    assert world.origin_branches() == ["main"]
+    github = world.github()
+    assert github["prs"] == {}
+    sha = git("rev-parse", "--short", "main", cwd=world.origin)
+    assert github["issues"]["1"] == {**github["issues"]["1"], "state": "CLOSED", "comment": f"Pushed to main in {sha}"}
+
+
+def test_direct_still_refuses_a_failing_check(world: World):
+    world.issues(i1={"title": "Thing"})
+    broken = "git switch -q -c feat/thing && touch broken && git add . && git commit -qm 'feat: add thing'"
+    world.scenario(*[{"sh": broken if i == 0 else "true", "report": DONE} for i in range(3)])
+    done = world.afk("run", "--direct", stdin="stop\n")
+    assert "Merged: none" in done.stdout
+    assert world.origin_log() == ["chore: start"]
+
+
 def test_blocked_issue_waits(world: World):
     world.issues(i1={"title": "Waiting", "blocked": 1})
     done = world.afk("run")

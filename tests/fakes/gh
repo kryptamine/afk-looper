@@ -44,6 +44,8 @@ match args[:2]:
         print(json.dumps({"state": state["issues"][args[2]]["state"]}))
     case ["issue", "close"]:
         state["issues"][args[2]]["state"] = "CLOSED"
+        if "--comment" in args:
+            state["issues"][args[2]]["comment"] = flag("--comment")
         save()
     case ["pr", "view"]:
         sys.exit(1)

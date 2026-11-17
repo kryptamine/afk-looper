@@ -22,10 +22,11 @@ class Stop(Exception):
 
 
 class Looper:
-    def __init__(self, repo: Repo, config: Config, danger: bool = False) -> None:
+    def __init__(self, repo: Repo, config: Config, danger: bool = False, direct: bool = False) -> None:
         self.repo = repo
         self.config = config
         self.danger = danger
+        self.direct = direct
         self.merged: list[int] = []
         self.skipped: list[int] = []
         self.runs = 0
@@ -110,7 +111,7 @@ class Looper:
 
         branch = run("git", "branch", "--show-current", cwd=self.repo.worktree)
         print(f"--- Publishing {branch}")
-        self._retrying(issue, f"Publishing {branch}", lambda: publish(self.repo, issue, branch, title, body))
+        self._retrying(issue, f"Publishing {branch}", lambda: publish(self.repo, issue, branch, title, body, self.direct))
 
     def _gate(self) -> str | None:
         print(f"--- Gate: {self.config.check}")
